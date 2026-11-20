@@ -103,7 +103,7 @@ Anyone can run this project locally. Full details are in the [setup guide](docs/
 |----------|--------------------|
 | [docs/setup_guide.md](docs/setup_guide) | How to get the source files, set your local path, and run the scripts in the right order. Includes troubleshooting. |
 | [docs/data_catalog.md](docs/data_catalog) | Every table and column in the Bronze and Gold layers, with data types and descriptions. |
-| [docs/naming_conventions.md](docs/naming_conventions) | Rules for naming schemas, tables, columns, procedures and files. |
+| [docs/naming_conventions.md](docs/Naming_Conventions) | Rules for naming schemas, tables, columns, procedures and files. |
 | `docs/data_architecture.drawio` | The project's architecture diagram. |
 | `docs/data_flow.drawio` | The data flow diagram. |
 | `docs/data_models.drawio` | The data models (star schema). |

@@ -1,0 +1,171 @@
+/*
+===============================================================================
+Script 2 of 3: DDL Script - Create Bronze Tables
+===============================================================================
+Script Purpose:
+    This script creates tables in the 'bronze' schema, dropping existing tables
+    if they already exist.
+    Run this script to re-define the DDL structure of 'bronze' Tables.
+
+WARNING:
+    Running this script drops the 6 bronze tables if they exist, which deletes
+    any data in them. That is fine here because load_bronze.sql reloads
+    everything from the CSV files.
+
+===============================================================================
+SETUP GUIDE - READ THIS BEFORE RUNNING
+===============================================================================
+
+Where this script fits (run the scripts in this order):
+    1) 01_init_database.sql    (database + schemas)
+    2) 02_ddl_bronze.sql       <- THIS SCRIPT (6 empty bronze tables)
+    3) load_bronze.sql         (procedure that loads the CSV files)
+       then:  EXEC bronze.load_bronze;
+
+Requirements:
+    - Script 1 must have been run first. This script needs the 'DataWarehouse'
+      database and the 'bronze' schema to already exist.
+    - Make sure the DataWarehouse database is selected before running
+      (in SSMS use the database drop-down, or run:  USE DataWarehouse; ).
+      If you forget, the tables will be created in the wrong database
+      (or you will get "Invalid schema name 'bronze'").
+    - No source files are needed for this script. It only creates empty
+      tables. The CSV files are used later by load_bronze.sql.
+
+What the script does (the same pattern is repeated for each table):
+    1) IF OBJECT_ID('schema.table', 'U') IS NOT NULL DROP TABLE ...
+           Checks if the user table ('U') already exists and drops it, so the
+           script can be re-run safely without "object already exists" errors.
+    2) CREATE TABLE ...
+           Creates the empty table with its columns and data types.
+    3) GO
+           Separator used by SSMS / sqlcmd to send each batch to the server.
+           It is not a SQL command, so it will not work in some other tools
+           unless they support it.
+
+Tables created and where their data comes from:
+
+    Source system CRM (Customer Relationship Management)  -> folder source_crm
+        bronze.crm_cust_info       <- cust_info.csv       customer master data
+        bronze.crm_prd_info        <- prd_info.csv        product information
+        bronze.crm_sales_details   <- sales_details.csv   sales transactions
+
+    Source system ERP (Enterprise Resource Planning)      -> folder source_erp
+        bronze.erp_loc_a101        <- loc_a101.csv        customer country/location
+        bronze.erp_cust_az12       <- cust_az12.csv       extra customer data (birth date, gender)
+        bronze.erp_px_cat_g1v2     <- px_cat_g1v2.csv     product categories
+
+Naming convention:
+        <layer>.<source system>_<original file/table name>
+    e.g.  bronze.crm_cust_info  = bronze layer + CRM system + 'cust_info'
+    The bronze table names keep the original source names on purpose, so it is
+    always clear where each table came from. Do not rename them, because
+    load_bronze.sql refers to these exact names.
+
+Important design notes:
+    - Column names, order and count must match the CSV files exactly, because
+      BULK INSERT maps CSV columns to table columns by position. If you change
+      a column here, the CSV load will fail or load data into the wrong column.
+    - Bronze keeps the raw data as it arrives. That is why, for example, the
+      date columns in bronze.crm_sales_details (sls_order_dt, sls_ship_dt,
+      sls_due_dt) are INT: in the source they are stored as numbers, not real
+      dates. Converting them to proper DATE values is done later in the
+      silver layer, not here.
+    - No primary keys, constraints or transformations are added in bronze.
+      The goal is simply to land the raw data.
+
+How to verify it worked:
+    SELECT TABLE_SCHEMA, TABLE_NAME
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'bronze';
+    (You should see the 6 tables listed above.)
+
+Common errors and fixes:
+    "Invalid schema name 'bronze'" / "Cannot find the schema"
+        -> Run 01_init_database.sql first, and make sure the DataWarehouse
+           database is the active one.
+    Later, during load_bronze.sql: "Bulk load data conversion error"
+        -> The CSV does not match these column definitions (wrong column
+           count/order or a modified CSV file).
+===============================================================================
+*/
+
+IF OBJECT_ID('bronze.crm_cust_info', 'U') IS NOT NULL
+    DROP TABLE bronze.crm_cust_info;
+GO
+
+CREATE TABLE bronze.crm_cust_info (
+    cst_id              INT,
+    cst_key             NVARCHAR(50),
+    cst_firstname       NVARCHAR(50),
+    cst_lastname        NVARCHAR(50),
+    cst_marital_status  NVARCHAR(50),
+    cst_gndr            NVARCHAR(50),
+    cst_create_date     DATE
+);
+GO
+
+IF OBJECT_ID('bronze.crm_prd_info', 'U') IS NOT NULL
+    DROP TABLE bronze.crm_prd_info;
+GO
+
+CREATE TABLE bronze.crm_prd_info (
+    prd_id       INT,
+    prd_key      NVARCHAR(50),
+    prd_nm       NVARCHAR(50),
+    prd_cost     INT,
+    prd_line     NVARCHAR(50),
+    prd_start_dt DATETIME,
+    prd_end_dt   DATETIME
+);
+GO
+
+IF OBJECT_ID('bronze.crm_sales_details', 'U') IS NOT NULL
+    DROP TABLE bronze.crm_sales_details;
+GO
+
+CREATE TABLE bronze.crm_sales_details (
+    sls_ord_num  NVARCHAR(50),
+    sls_prd_key  NVARCHAR(50),
+    sls_cust_id  INT,
+    sls_order_dt INT,
+    sls_ship_dt  INT,
+    sls_due_dt   INT,
+    sls_sales    INT,
+    sls_quantity INT,
+    sls_price    INT
+);
+GO
+
+IF OBJECT_ID('bronze.erp_loc_a101', 'U') IS NOT NULL
+    DROP TABLE bronze.erp_loc_a101;
+GO
+
+CREATE TABLE bronze.erp_loc_a101 (
+    cid    NVARCHAR(50),
+    cntry  NVARCHAR(50)
+);
+GO
+
+IF OBJECT_ID('bronze.erp_cust_az12', 'U') IS NOT NULL
+    DROP TABLE bronze.erp_cust_az12;
+GO
+
+CREATE TABLE bronze.erp_cust_az12 (
+    cid    NVARCHAR(50),
+    bdate  DATE,
+    gen    NVARCHAR(50)
+);
+GO
+
+IF OBJECT_ID('bronze.erp_px_cat_g1v2', 'U') IS NOT NULL
+    DROP TABLE bronze.erp_px_cat_g1v2;
+GO
+
+CREATE TABLE bronze.erp_px_cat_g1v2 (
+    id           NVARCHAR(50),
+    cat          NVARCHAR(50),
+    subcat       NVARCHAR(50),
+    maintenance  NVARCHAR(50)
+);
+GO

@@ -1,0 +1,109 @@
+/*
+===============================================================================
+Script 1 of 3: Create Database and Schemas
+===============================================================================
+Script Purpose:
+    This script creates a new database named 'DataWarehouse' after checking if it
+    already exists. If the database exists, it is dropped and recreated.
+    Additionally, the script sets up three schemas within the database:
+    'bronze', 'silver', and 'gold'.
+
+WARNING:
+    Running this script will drop the entire 'DataWarehouse' database if it exists.
+    All data in the database will be permanently deleted. Proceed with caution
+    and ensure you have proper backups before running this script.
+
+===============================================================================
+SETUP GUIDE - READ THIS BEFORE RUNNING
+===============================================================================
+
+Where this script fits (run the scripts in this order):
+    1) 01_init_database.sql    <- THIS SCRIPT (database + schemas)
+    2) 02_ddl_bronze.sql       (creates the 6 empty bronze tables)
+    3) load_bronze.sql         (creates the procedure that loads the CSV files)
+       then:  EXEC bronze.load_bronze;
+
+Requirements:
+    - Microsoft SQL Server (any edition, e.g. Express/Developer) and a client
+      such as SQL Server Management Studio (SSMS) or Azure Data Studio.
+    - A login that is allowed to create/drop databases (e.g. sysadmin or dbcreator).
+    - No source files are needed for this script. The CSV files are only used
+      later by load_bronze.sql.
+
+What the script does, step by step:
+    1) USE master
+           Switches to the 'master' system database. You cannot drop a database
+           while you are connected inside it, so we work from master.
+    2) Drop the old database if it exists
+           SINGLE_USER WITH ROLLBACK IMMEDIATE disconnects everyone else and
+           cancels their open transactions so the DROP does not get blocked.
+    3) CREATE DATABASE DataWarehouse
+           Creates a fresh, empty database with default settings.
+    4) CREATE SCHEMA bronze / silver / gold
+           Schemas are folders inside the database that organise the tables
+           by data quality layer (Medallion Architecture):
+
+           bronze  Raw data, loaded as-is from the source files (CSV).
+                   No cleaning, no transformations.
+           silver  Cleaned and standardised data (fixed types, removed
+                   duplicates, handled nulls, etc.).
+                   Not used by these scripts yet - the schema is just prepared.
+           gold    Business-ready data (e.g. fact and dimension views for
+                   reporting and analytics).
+                   Not used by these scripts yet - the schema is just prepared.
+
+Naming:
+    - The database name 'DataWarehouse' is a choice, not a requirement. If you
+      want a different name, replace 'DataWarehouse' everywhere in this script
+      (the IF EXISTS check, ALTER DATABASE, DROP DATABASE, CREATE DATABASE
+      and USE). Then make sure that database is selected before running the
+      other two scripts.
+    - Schema names (bronze, silver, gold) are used by the other scripts, so keep
+      them unchanged unless you update those scripts too.
+
+How to verify it worked:
+    SELECT name FROM sys.databases WHERE name = 'DataWarehouse';
+    SELECT name FROM DataWarehouse.sys.schemas
+    WHERE name IN ('bronze', 'silver', 'gold');
+    (You should get 1 row for the first query and 3 rows for the second.)
+
+Common errors and fixes:
+    "CREATE DATABASE permission denied in database 'master'"
+        -> Connect with a login that has permission to create databases.
+    "Database 'DataWarehouse' is in use" / cannot drop
+        -> Another session is connected. The script already forces
+           SINGLE_USER, but make sure your own query window is not
+           sitting inside DataWarehouse when you run it (stay on master).
+    "There is already an object named 'bronze' in the database"
+        -> Happens if you run only the schema part twice. Run the whole
+           script from the top so the database is dropped and recreated.
+===============================================================================
+*/
+
+USE master;
+GO
+
+-- Drop and recreate the 'DataWarehouse' database
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = 'DataWarehouse')
+BEGIN
+    ALTER DATABASE DataWarehouse SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE DataWarehouse;
+END;
+GO
+
+-- Create the 'DataWarehouse' database
+CREATE DATABASE DataWarehouse;
+GO
+
+USE DataWarehouse;
+GO
+
+-- Create Schemas
+CREATE SCHEMA bronze;
+GO
+
+CREATE SCHEMA silver;
+GO
+
+CREATE SCHEMA gold;
+GO

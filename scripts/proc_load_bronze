@@ -1,0 +1,268 @@
+/*
+===============================================================================
+Stored Procedure: Load Bronze Layer (Source -> Bronze)
+===============================================================================
+Script Purpose:
+    This stored procedure loads data into the 'bronze' schema from external CSV files.
+    It performs the following actions:
+    - Truncates the bronze tables before loading data (full load, no history kept).
+    - Uses the `BULK INSERT` command to load data from CSV files into bronze tables.
+    - Prints progress messages and load durations for every table and for the
+      whole batch.
+
+Parameters:
+    None.
+    This stored procedure does not accept any parameters or return any values.
+
+Usage Example:
+    EXEC bronze.load_bronze;
+
+===============================================================================
+SETUP GUIDE - READ THIS BEFORE RUNNING (the script will fail without it)
+===============================================================================
+
+This script does NOT contain the data. It reads CSV files from YOUR computer
+(or server), so you must download the files and tell the script where they are.
+
+-------------------------------------------------------------------------------
+STEP 1: Get the source files
+-------------------------------------------------------------------------------
+    - Download the project datasets from the course / lecture GitHub repository
+      (look for the folder called "datasets").
+    - You need 6 CSV files, split across 2 source systems:
+
+        source_crm/   (CRM = Customer Relationship Management system)
+            cust_info.csv
+            prd_info.csv
+            sales_details.csv
+
+        source_erp/   (ERP = Enterprise Resource Planning system)
+            loc_a101.csv
+            cust_az12.csv
+            px_cat_g1v2.csv
+
+    - Do NOT rename the files or folders unless you also change the names in
+      this script. The file names must match exactly.
+
+-------------------------------------------------------------------------------
+STEP 2: Place the files somewhere SQL Server can read them
+-------------------------------------------------------------------------------
+    IMPORTANT: BULK INSERT runs on the SQL Server machine, not on your client
+    tool (SSMS / Azure Data Studio). The path must be valid from the point of
+    view of the SQL Server.
+      - SQL Server installed on your own PC  -> any local folder works.
+      - SQL Server in Docker / VM / remote   -> copy the files INTO that
+                                                machine/container first.
+    - The SQL Server service account needs READ permission on the folder.
+      (Tip: if you get "Access denied" / "Operating system error code 5",
+       move the files to a simple folder like C:\sql\... and check permissions.)
+
+    Example folder layout (your base path can be anything you like):
+
+        C:\my_project\datasets\
+            |-- source_crm\
+            |       |-- cust_info.csv
+            |       |-- prd_info.csv
+            |       |-- sales_details.csv
+            |-- source_erp\
+                    |-- loc_a101.csv
+                    |-- cust_az12.csv
+                    |-- px_cat_g1v2.csv
+
+-------------------------------------------------------------------------------
+STEP 3: Replace the placeholder path in this script
+-------------------------------------------------------------------------------
+    Every file path below starts with the placeholder:
+
+        <YOUR_BASE_PATH>
+
+    Use Find & Replace (Ctrl + H) to replace   <YOUR_BASE_PATH>   with the
+    folder that CONTAINS 'source_crm' and 'source_erp'.
+
+    Example:
+        Replace:  <YOUR_BASE_PATH>
+        With:     C:\my_project\datasets
+        Result:   C:\my_project\datasets\source_crm\cust_info.csv
+
+    Rules: keep the backslashes (\), no trailing backslash on the base path,
+    and keep the quotes around the full path.
+
+-------------------------------------------------------------------------------
+STEP 4: Make sure the database objects already exist
+-------------------------------------------------------------------------------
+    Before running this procedure you must have already created:
+      1) The data warehouse database and the 'bronze' schema.
+      2) These 6 empty tables in the bronze schema (run the "DDL" / table
+         creation script from the lecture first):
+
+            bronze.crm_cust_info
+            bronze.crm_prd_info
+            bronze.crm_sales_details
+            bronze.erp_loc_a101
+            bronze.erp_cust_az12
+            bronze.erp_px_cat_g1v2
+
+    Table naming convention used in this project:
+            <layer>.<source system>_<original file/table name>
+        e.g. bronze . crm _ cust_info   <- from source_crm\cust_info.csv
+             bronze . erp _ loc_a101    <- from source_erp\loc_a101.csv
+
+    The columns of each table must match the columns of its CSV file
+    (same number of columns, same order), otherwise BULK INSERT will fail.
+
+-------------------------------------------------------------------------------
+STEP 5: Run it
+-------------------------------------------------------------------------------
+        EXEC bronze.load_bronze;
+
+    Then check the results, for example:
+        SELECT COUNT(*) FROM bronze.crm_cust_info;
+
+-------------------------------------------------------------------------------
+HOW THE SCRIPT WORKS (quick explanation of the options used)
+-------------------------------------------------------------------------------
+    TRUNCATE TABLE      Empties the table first so re-running the procedure
+                        does not create duplicate rows (full load).
+    BULK INSERT         Fast bulk-loads a file into a table.
+    FIRSTROW = 2        Skips row 1 because it contains the column headers.
+    FIELDTERMINATOR = ','  The CSV values are separated by commas.
+    TABLOCK             Locks the table during the load for better performance.
+    TRY...CATCH         If anything fails, the error message, number and state
+                        are printed instead of crashing silently.
+    GETDATE/DATEDIFF    Used to measure how long each table and the whole
+                        batch took to load.
+
+Common errors and fixes:
+    "Cannot bulk load. The file does not exist or you don't have permission"
+        -> Wrong path (Step 3), file not on the SQL Server machine (Step 2),
+           or missing read permission.
+    "Invalid object name 'bronze.xxx'"
+        -> The tables/schema were not created yet (Step 4).
+    "Bulk load data conversion error"
+        -> Table columns don't match the CSV columns, or the file was edited
+           / saved with a different delimiter.
+===============================================================================
+*/
+CREATE OR ALTER PROCEDURE bronze.load_bronze AS
+BEGIN
+	DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME; 
+	BEGIN TRY
+		SET @batch_start_time = GETDATE();
+		PRINT '================================================';
+		PRINT 'Loading Bronze Layer';
+		PRINT '================================================';
+
+		PRINT '------------------------------------------------';
+		PRINT 'Loading CRM Tables';
+		PRINT '------------------------------------------------';
+
+		SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.crm_cust_info';
+		TRUNCATE TABLE bronze.crm_cust_info;
+		PRINT '>> Inserting Data Into: bronze.crm_cust_info';
+		BULK INSERT bronze.crm_cust_info
+		FROM '<YOUR_BASE_PATH>\source_crm\cust_info.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+        SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.crm_prd_info';
+		TRUNCATE TABLE bronze.crm_prd_info;
+
+		PRINT '>> Inserting Data Into: bronze.crm_prd_info';
+		BULK INSERT bronze.crm_prd_info
+		FROM '<YOUR_BASE_PATH>\source_crm\prd_info.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+        SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.crm_sales_details';
+		TRUNCATE TABLE bronze.crm_sales_details;
+		PRINT '>> Inserting Data Into: bronze.crm_sales_details';
+		BULK INSERT bronze.crm_sales_details
+		FROM '<YOUR_BASE_PATH>\source_crm\sales_details.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+		PRINT '------------------------------------------------';
+		PRINT 'Loading ERP Tables';
+		PRINT '------------------------------------------------';
+		
+		SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.erp_loc_a101';
+		TRUNCATE TABLE bronze.erp_loc_a101;
+		PRINT '>> Inserting Data Into: bronze.erp_loc_a101';
+		BULK INSERT bronze.erp_loc_a101
+		FROM '<YOUR_BASE_PATH>\source_erp\loc_a101.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+		SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.erp_cust_az12';
+		TRUNCATE TABLE bronze.erp_cust_az12;
+		PRINT '>> Inserting Data Into: bronze.erp_cust_az12';
+		BULK INSERT bronze.erp_cust_az12
+		FROM '<YOUR_BASE_PATH>\source_erp\cust_az12.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+		SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: bronze.erp_px_cat_g1v2';
+		TRUNCATE TABLE bronze.erp_px_cat_g1v2;
+		PRINT '>> Inserting Data Into: bronze.erp_px_cat_g1v2';
+		BULK INSERT bronze.erp_px_cat_g1v2
+		FROM '<YOUR_BASE_PATH>\source_erp\px_cat_g1v2.csv'
+		WITH (
+			FIRSTROW = 2,
+			FIELDTERMINATOR = ',',
+			TABLOCK
+		);
+		SET @end_time = GETDATE();
+		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+		PRINT '>> -------------';
+
+		SET @batch_end_time = GETDATE();
+		PRINT '=========================================='
+		PRINT 'Loading Bronze Layer is Completed';
+        PRINT '   - Total Load Duration: ' + CAST(DATEDIFF(SECOND, @batch_start_time, @batch_end_time) AS NVARCHAR) + ' seconds';
+		PRINT '=========================================='
+	END TRY
+	BEGIN CATCH
+		PRINT '=========================================='
+		PRINT 'ERROR OCCURED DURING LOADING BRONZE LAYER'
+		PRINT 'Error Message' + ERROR_MESSAGE();
+		PRINT 'Error Message' + CAST (ERROR_NUMBER() AS NVARCHAR);
+		PRINT 'Error Message' + CAST (ERROR_STATE() AS NVARCHAR);
+		PRINT '=========================================='
+	END CATCH
+END

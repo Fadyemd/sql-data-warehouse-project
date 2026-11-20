@@ -15,14 +15,6 @@ The data architecture for this project follows Medallion Architecture **Bronze**
 2. **Silver Layer**: This layer includes data cleansing, standardization, and normalization processes to prepare data for analysis.
 3. **Gold Layer**: Houses business-ready data modeled into a star schema required for reporting and analytics (`dim_customers`, `dim_products`, `fact_sales`).
 
-### Current progress
-
-| Layer | Status |
-|-------|--------|
-| Bronze | Database, schemas, table DDL and load procedure available |
-| Silver | TODO: set status |
-| Gold | TODO: set status (the data model is documented in the data catalog) |
-
 ---
 
 ## 📖 Project Overview
@@ -109,9 +101,9 @@ Anyone can run this project locally. Full details are in the [setup guide](docs/
 
 | Document | What you will find |
 |----------|--------------------|
-| [docs/setup_guide.md](docs/setup_guide.md) | How to get the source files, set your local path, and run the scripts in the right order. Includes troubleshooting. |
-| [docs/data_catalog.md](docs/data_catalog.md) | Every table and column in the Bronze and Gold layers, with data types and descriptions. |
-| [docs/naming_conventions.md](docs/naming_conventions.md) | Rules for naming schemas, tables, columns, procedures and files. |
+| [docs/setup_guide.md](docs/setup_guide) | How to get the source files, set your local path, and run the scripts in the right order. Includes troubleshooting. |
+| [docs/data_catalog.md](docs/data_catalog) | Every table and column in the Bronze and Gold layers, with data types and descriptions. |
+| [docs/naming_conventions.md](docs/naming_conventions) | Rules for naming schemas, tables, columns, procedures and files. |
 | `docs/data_architecture.drawio` | The project's architecture diagram. |
 | `docs/data_flow.drawio` | The data flow diagram. |
 | `docs/data_models.drawio` | The data models (star schema). |

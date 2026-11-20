@@ -80,7 +80,7 @@ These insights empower stakeholders with key business metrics, enabling strategi
 
 ## Quick Start
 
-Anyone can run this project locally. Full details are in the [setup guide](docs/setup_guide.md). The short version:
+Anyone can run this project locally. Full details are in the [setup guide](docs/Setup_Guide.md). The short version:
 
 1. **Install** SQL Server (Express is enough) and SQL Server Management Studio (SSMS). See the Important Links & Tools section above.
 2. **Clone** this repository.
